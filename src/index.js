@@ -1,5 +1,5 @@
-import makeAugmentedSchema from 'neo4j-graphql-js';
-import { ApolloServer, makeExecutableSchema } from 'apollo-server-express';
+import { makeAugmentedSchema } from 'neo4j-graphql-js';
+import { ApolloServer } from 'apollo-server-express';
 import express from 'express';
 import neo4j from 'neo4j-driver';
 
@@ -9,7 +9,7 @@ import resolvers from './resolvers';
 
 
 // const schema = makeAugmentedSchema({ typeDefs });
-const schema = makeExecutableSchema({ typeDefs, resolvers });
+const schema = makeAugmentedSchema({ typeDefs, resolvers });
 
 const app = express();
 
@@ -18,7 +18,7 @@ const driver = neo4j.driver(
     neo4j.auth.basic(config.neo4jUser, config.neo4jPassword)
 );
 
-const server = new ApolloServer({typeDefs, context: {driver}});
+const server = new ApolloServer({schema, context: {driver}});
 server.applyMiddleware({ app });
 
 app.listen(config.apolloListenningPort, () => {
