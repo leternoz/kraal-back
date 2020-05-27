@@ -1,24 +1,24 @@
-import { makeAugmentedSchema } from 'neo4j-graphql-js';
-import { ApolloServer } from 'apollo-server-express';
-import express from 'express';
-import neo4j from 'neo4j-driver';
+const { makeAugmentedSchema } = require('neo4j-graphql-js');
+const { ApolloServer } = require('apollo-server-express');
+const bodyParser = require('body-parser');
+const express = require('express');
+const neo4j = require('neo4j-driver');
 
-import config from './config.js';
-import typeDefs from './typedefs';
-import resolvers from './resolvers';
+const config = require('./config.js');
+const typeDefs = require('./typedefs');
+const resolvers = require('./resolvers');
+const { getTokenFromReq } = require('./auth');
 
-
-// const schema = makeAugmentedSchema({ typeDefs });
-const schema = makeAugmentedSchema({ typeDefs, resolvers });
+const schema = makeAugmentedSchema({ typeDefs, resolvers}); 
 
 const app = express();
 
 const driver = neo4j.driver(
     config.neo4jHost,
-    neo4j.auth.basic(config.neo4jUser, config.neo4jPassword)
+    neo4j.auth.basic(config.neo4jUser, config.neo4jPassword),
 );
 
-const server = new ApolloServer({schema, context: {driver}});
+const server = new ApolloServer({schema, context: {getTokenFromReq, driver}});
 server.applyMiddleware({ app });
 
 app.listen(config.apolloListenningPort, () => {

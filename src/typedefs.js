@@ -1,14 +1,14 @@
-import gql from 'graphql-tag';
+const gql = require('graphql-tag');
 
 // TODO mutation: signup, assign person to group
-
 const typeDefs = gql`
     scalar Date
 
     type User {
         email: String!
-        memberId: Int
+        memberId: Int 
         password: String
+        person: Person
     }
     
     type Person {
@@ -80,14 +80,34 @@ const typeDefs = gql`
         NURSE
     }
 
+    input AuthenticationInput {
+        login: String!
+        password: String!
+    }
+
+    type AuthenticationResult {
+        token: String
+        message: String
+    }
+
+    input SignUpInput {
+        email: String!
+        memberId: Int 
+        password: String!
+    }
+
+    type SignUpResult {
+        token: String
+        message: String
+    }
+
     type Query {
-        users: [User]
-        user(id: ID): User
         me: User
     }
  
     type Mutation {
-        login(email: String, password: String): String
+        login(input: AuthenticationInput): AuthenticationResult
+        signup(input: SignUpInput): SignUpResult
     }
 `;
 
