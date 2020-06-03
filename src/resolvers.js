@@ -1,6 +1,8 @@
 const { neo4jgraphql } = require('neo4j-graphql-js'); 
+const { ApolloError, UserInputError } = require('apollo-server');
 
 const { hashPassword, comparePassword, generateAccessToken } = require('./auth');
+const { errorCodes } = require('./errorHanling');
 const { isValidEmail, isValidMemberId} = require('./validators');
 const { getUserByEmail, getUserByMemberId, createUser, runQuery, parseFirstResult } = require('./databaseQueries');
 
@@ -20,18 +22,25 @@ const resolvers = {
             } else if(isValidMemberId(login)) {
                 cypherQuery = getUserByMemberId(login);
             } else {
-                console.error(`The login is neither an email or a member id, value : ${login}`);
-                return;
+                throw new UserInputError(`The login is neither an email or a member id, value : ${login}`);
             }
             // TODO fix the way to fetch a user to make it cleaner
             // TODO check if the user exists
             // TODO catch the errors, is there a GraphQL way to do it ?
             const queryResult = await runQuery(context, null, cypherQuery );
             const userRetrieved = parseFirstResult(queryResult);
+            if(!userRetrieved){
+                throw new ApolloError(errorCodes.FAILED_LOGIN.message, errorCodes.FAILED_LOGIN.code);
+            }
             const isCredentialsValid = await comparePassword(password, userRetrieved.password);
-            return isCredentialsValid ? {token: generateAccessToken(userRetrieved), message: "user authenticated successfully"} : {token: null, message: "failed to authenticate"};
+            if(!isCredentialsValid) {
+                throw new ApolloError(errorCodes.FAILED_LOGIN.message, errorCodes.FAILED_LOGIN.code);
+            }
+            // return isCredentialsValid ? {token: generateAccessToken(userRetrieved), message: "user authenticated successfully"} : {token: null, message: "failed to authenticate"};
+            return {token: generateAccessToken(userRetrieved), message: "user authenticated successfully"};
         },
         signup: async (root, args, context, info) => {
+            // TODO send email to confirm
             const userToCreate = args.input;
             userToCreate.password = await hashPassword(userToCreate.password);
             const queryResult = await runQuery(context, null, createUser(userToCreate));

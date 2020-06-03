@@ -25,7 +25,7 @@ const runQuery = async (context, params, query ) => {
  * @param {*} queryResult 
  */
 const parseFirstResult = (queryResult) => {
-    return queryResult.records[0]._fields[0].properties;
+    return (queryResult.records.length && queryResult.records[0]._fields[0].properties) || null;
 }
 
 module.exports = { getUserByEmail, getUserByMemberId, createUser, runQuery, parseFirstResult };
