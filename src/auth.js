@@ -35,7 +35,21 @@ const generateAccessToken = (payload) => {
 
 const getTokenFromReq = (req) => {
     const tokenWithBearer = req.headers.authorization || '';
-    return token = header.replace('Bearer ', '');
+    return token = tokenWithBearer.replace('Bearer ', '');
 };
 
-module.exports = { hashPassword, comparePassword, generateAccessToken, getTokenFromReq };
+/**
+ * 
+ * @param {*} req, the request with the token, and the user in the payload
+ */
+const getDataFromReqToken = (req) => {
+    const token = getTokenFromReq(req);
+    if(token) {
+        return jwt.decode(token).data;
+    }
+    return null;
+};
+
+
+
+module.exports = { hashPassword, comparePassword, generateAccessToken, getDataFromReqToken };

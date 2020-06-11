@@ -1,6 +1,5 @@
 const gql = require('graphql-tag');
 
-// TODO mutation: signup, assign person to group
 const typeDefs = gql`
     scalar Date
 
@@ -8,17 +7,27 @@ const typeDefs = gql`
         email: String!
         memberId: Int 
         password: String
-        person: Person
+        roles: [Role]
+        person: Person @relation(name: "CORRESPONDS_TO", direction: "OUT")
+    }
+
+    enum Role {
+        ADMIN,
+        MODERATOR,
+        USER
     }
     
     type Person {
         email: String!
         name: String
         surname: String
-        adress: String
+        address: String
         city: City @relation(name: "LIVES_IN", direction:"OUT")
-        birthDate: Date
+        dateOfBirth: Date
+        phone: String
+        secondPhone: String
 
+        user: User @relation(name: "LINKED_TO", direction: "IN")
         scout: [Scout]
         chief: [Chief]
         manager: [Manager]
@@ -67,7 +76,7 @@ const typeDefs = gql`
         endDate: Date        
     }
 
-    type Manager {
+    type Manager @relation(name: "IS_MANAGER_IN") {
         from: Person
         to: Group
         role: String
@@ -103,6 +112,7 @@ const typeDefs = gql`
 
     type Query {
         me: User
+        getProfile(email: String): User
     }
  
     type Mutation {

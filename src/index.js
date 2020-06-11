@@ -3,10 +3,13 @@ const { ApolloServer } = require('apollo-server-express');
 const express = require('express');
 const neo4j = require('neo4j-driver');
 
+if(process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
 const config = require('./config.js');
 const typeDefs = require('./typedefs');
 const resolvers = require('./resolvers');
-const { getTokenFromReq } = require('./auth');
+const { getDataFromReqToken } = require('./auth');
 
 const schema = makeAugmentedSchema({ typeDefs, resolvers}); 
 
@@ -17,7 +20,7 @@ const driver = neo4j.driver(
     neo4j.auth.basic(config.neo4jUser, config.neo4jPassword),
 );
 
-const server = new ApolloServer({schema, context: {getTokenFromReq, driver}});
+const server = new ApolloServer({schema, context: ({req}) => {return {...getDataFromReqToken(req), driver}}});
 server.applyMiddleware({ app });
 
 app.listen(config.apolloListenningPort, () => {

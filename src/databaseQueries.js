@@ -10,15 +10,9 @@ const createUser = (user) => {
     return `CREATE (user:User {email: "${user.email}", memberId: ${user.memberId}, password: "${user.password}"}) RETURN user;`;
 };
 
-/**
- * Run the query in the neo4j database
- * @param {*} context 
- * @param {*} params 
- * @param {*} query, the cypher query
- */
-const runQuery = async (context, params, query ) => {
-    return context.driver.session().run(query, params);
-};
+const getProfile = (email) => {
+    return `MATCH path = (user:User {email: "${email}"}) - [:CORRESPONDS_TO] -> (person:Person) - [:LIVES_IN] -> (city:City) RETURN user, person, city`;
+}
 
 /**
  * Return the first object from a neo4j query
@@ -28,4 +22,10 @@ const parseFirstResult = (queryResult) => {
     return (queryResult.records.length && queryResult.records[0]._fields[0].properties) || null;
 }
 
-module.exports = { getUserByEmail, getUserByMemberId, createUser, runQuery, parseFirstResult };
+module.exports = { 
+    getUserByEmail, 
+    getUserByMemberId,
+    getProfile, 
+    createUser, 
+    parseFirstResult
+};

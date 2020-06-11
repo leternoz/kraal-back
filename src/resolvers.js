@@ -1,20 +1,84 @@
 const { neo4jgraphql } = require('neo4j-graphql-js'); 
-const { ApolloError, UserInputError } = require('apollo-server');
+const { GraphQLScalarType } = require('graphql');
+const { Kind } = require('graphql/language');
+const { ApolloError, UserInputError, AuthenticationError } = require('apollo-server');
 
 const { hashPassword, comparePassword, generateAccessToken } = require('./auth');
 const { errorCodes } = require('./errorHanling');
 const { isValidEmail, isValidMemberId} = require('./validators');
-const { getUserByEmail, getUserByMemberId, createUser, runQuery, parseFirstResult } = require('./databaseQueries');
+const { getUserByEmail, getUserByMemberId, getProfile, createUser, parseFirstResult } = require('./databaseQueries');
 
 const resolvers = {
+    Date: new GraphQLScalarType({
+        name: 'Date',
+        description: 'Date custom scalar type',
+        parseValue(value) {
+          return new Date(value); // value from the client
+        },
+        serialize(value) {
+          return value.getTime(); // value sent to the client
+        },
+        parseLiteral(ast) {
+          if (ast.kind === Kind.INT) {
+            return new Date(+ast.value) // ast value is always in string format
+          }
+          return null;
+        },
+      }),  
     Query: {
-        User: (root, params, context, info) => {
-            return neo4jgraphql(root, params, context, info);
+        getProfile: (_, args, context, __) => {
+            const user = context.user;
+            // if(user === null) {
+                // throw new AuthenticationError('The user is not authenticated');
+                // }
+                // const cypherQuery = getProfile(user.email); 
+            // TODO add the date to the result   
+            // const cypherQuery = getProfile(args.email);
+            const cypherQuery = getProfile(user.email);
+            const session = context.driver.session();
+            return session.run(cypherQuery, null)
+            .then( result => {
+                const record = result.records[0];
+                // TODO handle when no result
+                // Note:  there there are no city associated, then no result
+                if(record) {
+                    const user = record.get('user').properties;
+                    const person = record.get('person').properties;
+                    const city = record.get('city').properties;
+                    return {
+                        email: user.email,
+                        memberId: user.memberId,
+                        person: {
+                            email: person.email,
+                            name: person.name,
+                            surname: person.surname,
+                            address: person.address,
+                            phone: person.phone,
+                            secondPhone: person.secondPhone,
+                            dateOfBirth: {
+                                year: person.dateOfBirth.year.low,
+                                month: person.dateOfBirth.month.low,
+                                day: person.dateOfBirth.day.low
+                            },
+                            city: {
+                                name: city.name,
+                                code: city.code.low
+                            }
+                        }
+                    };
+                }
+                return null;
+            })
+            .catch(e => {
+                console.error(e);
+                throw new Error('INTERNAL_SERVER_ERROR');
+            })
+            .finally(() => session.close());
         }
     },
  
     Mutation: {
-        login: async (root, args, context, info)  => {
+        login: (_, args, context, __)  => {
             let cypherQuery;
             const { login, password } = args.input;
             if (isValidEmail(login)) {
@@ -24,27 +88,54 @@ const resolvers = {
             } else {
                 throw new UserInputError(`The login is neither an email or a member id, value : ${login}`);
             }
-            // TODO fix the way to fetch a user to make it cleaner
-            // TODO check if the user exists
-            // TODO catch the errors, is there a GraphQL way to do it ?
-            const queryResult = await runQuery(context, null, cypherQuery );
-            const userRetrieved = parseFirstResult(queryResult);
-            if(!userRetrieved){
-                throw new ApolloError(errorCodes.FAILED_LOGIN.message, errorCodes.FAILED_LOGIN.code);
-            }
-            const isCredentialsValid = await comparePassword(password, userRetrieved.password);
-            if(!isCredentialsValid) {
-                throw new ApolloError(errorCodes.FAILED_LOGIN.message, errorCodes.FAILED_LOGIN.code);
-            }
-            // return isCredentialsValid ? {token: generateAccessToken(userRetrieved), message: "user authenticated successfully"} : {token: null, message: "failed to authenticate"};
-            return {token: generateAccessToken(userRetrieved), message: "user authenticated successfully"};
+            const session = context.driver.session();
+            return session.run(cypherQuery, null)
+            .then(async result => {
+                const userRetrieved = parseFirstResult(result);
+                if(!userRetrieved){
+                    const err = new ApolloError(errorCodes.FAILED_LOGIN.message, errorCodes.FAILED_LOGIN.code);
+                    console.error(err)
+                    throw new err;
+                }
+                const isCredentialsValid = await comparePassword(password, userRetrieved.password);
+                if(!isCredentialsValid) {
+                    const err = new ApolloError(errorCodes.FAILED_LOGIN.message, errorCodes.FAILED_LOGIN.code);
+                    console.error(err)
+                    throw err;
+                }
+                const payload = {
+                    user: {
+                        email: userRetrieved.email,
+                        memberId: userRetrieved.memberId
+                    }
+                };
+                return {token: generateAccessToken(payload), message: "user authenticated successfully"};
+            })
+            .finally(() => session.close());
+
+
         },
-        signup: async (root, args, context, info) => {
+        signup: async (_, args, context, __) => {
             // TODO send email to confirm
+            const session = context.driver.session();
             const userToCreate = args.input;
             userToCreate.password = await hashPassword(userToCreate.password);
-            const queryResult = await runQuery(context, null, createUser(userToCreate));
-            return {token: generateAccessToken(userToCreate), message: "user created successfully"};
+            return session.run(cypherQuery, null)
+                .then(result => {
+                    const payload = {
+                        user: {
+                            email: userToCreate.email,
+                            memberId: userToCreate.memberId
+                        }
+                    };
+                    return {token: generateAccessToken(payload), message: "user created successfully"};
+                })
+                .catch(e => {
+                    console.error(e);
+                    throw new Error('INTERNAL_SERVER_ERROR');
+                })
+                .finally(() => session.close());
+
         }
     }
 };
