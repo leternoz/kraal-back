@@ -1,6 +1,5 @@
 const { neo4jgraphql } = require('neo4j-graphql-js'); 
-const { GraphQLScalarType } = require('graphql');
-const { Kind } = require('graphql/language');
+
 const { ApolloError, UserInputError, AuthenticationError } = require('apollo-server');
 
 const { hashPassword, comparePassword, generateAccessToken } = require('./auth');
@@ -9,22 +8,6 @@ const { isValidEmail, isValidMemberId} = require('./validators');
 const { getUserByEmail, getUserByMemberId, getProfile, createUser, parseFirstResult } = require('./databaseQueries');
 
 const resolvers = {
-    Date: new GraphQLScalarType({
-        name: 'Date',
-        description: 'Date custom scalar type',
-        parseValue(value) {
-          return new Date(value); // value from the client
-        },
-        serialize(value) {
-          return value.getTime(); // value sent to the client
-        },
-        parseLiteral(ast) {
-          if (ast.kind === Kind.INT) {
-            return new Date(+ast.value) // ast value is always in string format
-          }
-          return null;
-        },
-      }),  
     Query: {
         getProfile: (_, args, context, __) => {
             const user = context.user;
@@ -33,7 +16,7 @@ const resolvers = {
                 // }
                 // const cypherQuery = getProfile(user.email); 
             // TODO add the date to the result   
-            // const cypherQuery = getProfile(args.email);
+            // const cypherQuery = getProfile(args.email); // TEST
             const cypherQuery = getProfile(user.email);
             const session = context.driver.session();
             return session.run(cypherQuery, null)
@@ -46,9 +29,11 @@ const resolvers = {
                     const person = record.get('person').properties;
                     const city = record.get('city').properties;
                     return {
+                        id: user.id,
                         email: user.email,
-                        memberId: user.memberId,
+                        memberId: user.memberId.low,
                         person: {
+                            id: person.id,
                             email: person.email,
                             name: person.name,
                             surname: person.surname,
@@ -61,8 +46,9 @@ const resolvers = {
                                 day: person.dateOfBirth.day.low
                             },
                             city: {
+                                id: city.id,
                                 name: city.name,
-                                code: city.code.low
+                                code: city.code
                             }
                         }
                     };
@@ -105,6 +91,7 @@ const resolvers = {
                 }
                 const payload = {
                     user: {
+                        id: userRetrieved.id,
                         email: userRetrieved.email,
                         memberId: userRetrieved.memberId
                     }
@@ -115,17 +102,20 @@ const resolvers = {
 
 
         },
-        signup: async (_, args, context, __) => {
+        signup: async (_, args, context, info) => {
             // TODO send email to confirm
             const session = context.driver.session();
             const userToCreate = args.input;
             userToCreate.password = await hashPassword(userToCreate.password);
+            const cypherQuery = createUser(userToCreate);
             return session.run(cypherQuery, null)
                 .then(result => {
+                    const userCreated = result.records[0].get('user').properties;
                     const payload = {
                         user: {
-                            email: userToCreate.email,
-                            memberId: userToCreate.memberId
+                            id: userCreated.id,
+                            email: userCreated.email,
+                            memberId: userCreated.memberId
                         }
                     };
                     return {token: generateAccessToken(payload), message: "user created successfully"};

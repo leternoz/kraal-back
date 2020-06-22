@@ -7,7 +7,7 @@ const getUserByMemberId = (memberId) => {
 };
 
 const createUser = (user) => {
-    return `CREATE (user:User {email: "${user.email}", memberId: ${user.memberId}, password: "${user.password}"}) RETURN user;`;
+    return `CREATE (user:User {id: apoc.create.uuid(), email: "${user.email}", memberId: ${user.memberId}, password: "${user.password}"}) RETURN user;`;
 };
 
 const getProfile = (email) => {

@@ -4,6 +4,7 @@ const typeDefs = gql`
     scalar Date
 
     type User {
+        id: ID!
         email: String!
         memberId: Int 
         password: String
@@ -18,7 +19,7 @@ const typeDefs = gql`
     }
     
     type Person {
-        email: String!
+        id: ID!
         name: String
         surname: String
         address: String
@@ -56,8 +57,9 @@ const typeDefs = gql`
     }
 
     type City {
+        id: ID!
         name: String
-        code: Int
+        code: String
     }
 
     type Scout @relation(name: "IS_SCOUT_IN") {
@@ -111,7 +113,6 @@ const typeDefs = gql`
     }
 
     type Query {
-        me: User
         getProfile(email: String): User
     }
  
